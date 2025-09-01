@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 # --- API KEY handling (safe) ---
 load_dotenv()
 # fallback to the literal in code only if .env isn't set
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or "AIzaSyADNKOZx7PVtvxJRQdMHwvcqJOt24Ose0Y"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or "ENTER GEMINI API KEY HERE"
 
 def extract_text_from_pdf(pdf_file):
     """Works with Gradio v5: get the file path and read bytes."""
@@ -188,3 +188,4 @@ body {
                       outputs=output)
 
 demo.launch()
+
