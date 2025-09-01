@@ -2,12 +2,34 @@ import gradio as gr
 import fitz  # PyMuPDF
 import requests
 import json
+import os
+from dotenv import load_dotenv
 
-GEMINI_API_KEY = "INSERT API HERE"  # Replace with your Gemini API key
+# --- API KEY handling (safe) ---
+load_dotenv()
+# fallback to the literal in code only if .env isn't set
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or "AIzaSyADNKOZx7PVtvxJRQdMHwvcqJOt24Ose0Y"
 
 def extract_text_from_pdf(pdf_file):
+    """Works with Gradio v5: get the file path and read bytes."""
+    if pdf_file is None:
+        return ""
+
+    # Gradio provides an object with .name (temp path) OR sometimes a dict/path string
+    path = getattr(pdf_file, "name", None)
+    if path is None and isinstance(pdf_file, dict):
+        path = pdf_file.get("name") or pdf_file.get("path")
+    if path is None and isinstance(pdf_file, str):
+        path = pdf_file
+
+    if not path:
+        return ""
+
+    with open(path, "rb") as f:
+        data = f.read()
+
     text = ""
-    with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
+    with fitz.open(stream=data, filetype="pdf") as doc:
         for page in doc:
             text += page.get_text()
     return text.strip()
@@ -36,7 +58,7 @@ Please return the response in this exact format (no markdown):
     data = {"contents": [{"parts": [{"text": prompt}]}]}
 
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(data))
+        response = requests.post(url, headers=headers, data=json.dumps(data), timeout=60)
         result = response.json()
         raw = result['candidates'][0]['content']['parts'][0]['text']
     except Exception as e:
@@ -48,7 +70,7 @@ Please return the response in this exact format (no markdown):
         skills = raw.split("2.")[1].split("3.")[0].strip().split("\n")
         project = raw.split("3.")[1].split("4.")[0].strip()
         keywords = raw.split("4.")[1].strip().split("\n")
-    except:
+    except Exception:
         return f"""
         <div style="padding: 20px; background:#1e1e1e; color:#f5f5f5; font-family:'Segoe UI'; border-radius:12px;">
             <h3 style="color:#ff5e5e;">⚠ Gemini Response Was Not Structured</h3>
@@ -111,7 +133,12 @@ Please return the response in this exact format (no markdown):
     return html
 
 def smart_resume_analyzer(input_mode, resume_text, resume_pdf, role, company, location):
-    resume_data = resume_text if input_mode == "Paste Text" else extract_text_from_pdf(resume_pdf)
+    try:
+        resume_data = resume_text if input_mode == "Paste Text" else extract_text_from_pdf(resume_pdf)
+    except Exception as e:
+        return f"<h3 style='color:red;'>❌ PDF Read Error: {str(e)}</h3>"
+    if not resume_data:
+        return "<h3 style='color:orange;'>⚠ No text extracted from the PDF. If it’s a scanned/image PDF, try pasting text.</h3>"
     return analyze_resume(resume_data, role, company, location)
 
 # Gradio UI
